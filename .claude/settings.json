@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [[ \"$TOOL_INPUT\" == *\"autopilot:\"* ]] && [ ! -f /tmp/.autopilot-update-checked ]; then touch /tmp/.autopilot-update-checked; $CLAUDE_PLUGIN_DIR/scripts/check-update.sh 2>/dev/null; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}

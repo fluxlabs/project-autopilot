@@ -1,0 +1,50 @@
+{
+  "name": "autopilot-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Project Autopilot - External tool integration and project management",
+  "author": "Jeremy McSpadden <jeremy@fluxlabs.net>",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/autopilot-server.js",
+  "bin": {
+    "autopilot-mcp": "./dist/autopilot-server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/autopilot-server.js",
+    "dev": "tsx autopilot-server.ts",
+    "lint": "eslint . --ext .ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0",
+    "tsx": "^4.7.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "autopilot",
+    "project-management",
+    "ai-tools",
+    "claude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fluxlabs/project-autopilot.git"
+  }
+}

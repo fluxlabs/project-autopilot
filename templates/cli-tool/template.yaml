@@ -1,0 +1,103 @@
+# CLI Tool Template
+# Project Autopilot - Node.js command-line tool template
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+
+name: cli-tool
+version: "1.0"
+description: Node.js command-line tool with Commander, TypeScript, and npm packaging
+author: Project Autopilot
+
+techStack:
+  - node
+  - typescript
+  - commander
+
+variables:
+  - name: project_name
+    description: CLI tool name (used as command name)
+    required: true
+
+  - name: description
+    description: Tool description
+    default: "A command-line tool built with Node.js"
+
+  - name: bin_name
+    description: Binary name (command to run)
+    default: "{{project_name}}"
+
+  - name: include_config
+    description: Include configuration file support (cosmiconfig)
+    type: boolean
+    default: true
+
+  - name: include_interactive
+    description: Include interactive prompts (inquirer)
+    type: boolean
+    default: true
+
+  - name: output_format
+    description: Default output format
+    options:
+      - json
+      - table
+      - text
+    default: text
+
+  - name: author
+    description: Author name for package.json
+    default: ""
+
+phases:
+  - id: "001"
+    name: Project Setup
+    description: Initialize Node.js project with TypeScript and Commander
+    cost: 0.12
+    provides: "Project structure, TypeScript config, Commander setup"
+
+  - id: "002"
+    name: CLI Framework
+    description: Implement command structure and argument parsing
+    cost: 0.35
+    prerequisites: ["001"]
+    provides: "Main command, subcommands, options, help text"
+
+  - id: "003"
+    name: Core Functionality
+    description: Implement main business logic and utilities
+    cost: 0.65
+    prerequisites: ["002"]
+    provides: "Core features, file operations, data processing"
+
+  - id: "004"
+    name: Output & Formatting
+    description: Implement output formatting and progress indicators
+    cost: 0.35
+    prerequisites: ["003"]
+    provides: "JSON/table/text output, colors, spinners"
+
+  - id: "005"
+    name: Testing & Packaging
+    description: Add tests in npm packaging configuration
+    cost: 0.53
+    prerequisites: ["004"]
+    provides: "Unit tests, CLI tests, npm publish config"
+
+commands:
+  install: "npm install"
+  dev: "npm run dev"
+  build: "npm run build"
+  test: "npm test"
+  lint: "npm run lint"
+  link: "npm link"
+
+totalCost: 2.00
+
+features:
+  - Commander for CLI parsing
+  - TypeScript
+  - Colorful output with chalk
+  - Progress spinners with ora
+  - Configuration file support
+  - Interactive prompts
+  - JSON/table output
+  - npm packaging ready

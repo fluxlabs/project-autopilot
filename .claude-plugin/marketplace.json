@@ -1,0 +1,32 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fluxlabs-marketplace",
+  "description": "Autonomous project development with validated phase execution, parallel agent orchestration, and cross-session persistence",
+  "owner": {
+    "name": "FluxLabs",
+    "email": "jeremy@fluxlabs.dev"
+  },
+  "plugins": [
+    {
+      "name": "autopilot",
+      "description": "Autonomous project builder with 31 specialized agents, 46 commands, wave-based parallel execution, phase validation, cross-session persistence, and 60-80% token savings. One command builds entire projects hands-off.",
+      "version": "1.0.0",
+      "source": "./",
+      "category": "development",
+      "author": {
+        "name": "Jeremy McSpadden"
+      },
+      "keywords": [
+        "project-management",
+        "automation",
+        "token-optimization",
+        "agents",
+        "cost-tracking",
+        "phase-validation",
+        "wave-execution",
+        "cross-session",
+        "quality-gates"
+      ]
+    }
+  ]
+}

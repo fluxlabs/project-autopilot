@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Autopilot CLI shim -> sends Claude Code prompts
+# Keeps legacy verbs but dispatches to takeoff/cockpit/altitude.
+
+set -euo pipefail
+
+CLAUDE=${CLAUDE_BIN:-claude}
+DEFAULT_MODEL=${AUTOPILOT_MODEL:-}
+DEFAULT_COST=${AUTOPILOT_MAX_COST:-}
+LOG=${AUTOPILOT_LOG:-autopilot.log}
+
+run_claude() {
+  local prompt="$1"; shift || true
+  $CLAUDE --yes \
+    ${DEFAULT_MODEL:+--model "$DEFAULT_MODEL"} \
+    ${DEFAULT_COST:+--max-cost "$DEFAULT_COST"} \
+    -p "$prompt" "$@" | tee -a "$LOG"
+}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  autopilot takeoff "feature"   -> /autopilot:takeoff
+  autopilot cockpit             -> /autopilot:cockpit
+  autopilot altitude            -> /autopilot:altitude
+  autopilot radar               -> /autopilot:radar
+  autopilot flightplan [desc]   -> /autopilot:flightplan
+  autopilot preflight [desc]    -> /autopilot:preflight
+  autopilot landing             -> /autopilot:landing
+  autopilot debt [flags]        -> /autopilot:debt
+  autopilot security-scan       -> /autopilot:security-scan
+  autopilot config [flags]      -> /autopilot:config
+  autopilot loop                -> scripts/autopilot-loop.sh (cockpit)
+
+Env:
+  CLAUDE_BIN, AUTOPILOT_MODEL, AUTOPILOT_MAX_COST, AUTOPILOT_LOG
+EOF
+}
+
+cmd="${1:-}"; shift || true
+
+case "$cmd" in
+  takeoff|run|start|new|build)
+    desc="${*:-<description>}"
+    run_claude "/autopilot:takeoff \"${desc}\""
+    ;;
+  cockpit|resume|continue)
+    run_claude "/autopilot:cockpit"
+    ;;
+  altitude|status|info)
+    run_claude "/autopilot:altitude"
+    ;;
+  radar|scan)
+    run_claude "/autopilot:radar ${*:+$*}"
+    ;;
+  flightplan|plan)
+    run_claude "/autopilot:flightplan ${*:+$*}"
+    ;;
+  preflight)
+    run_claude "/autopilot:preflight ${*:+$*}"
+    ;;
+  landing|validate)
+    run_claude "/autopilot:landing ${*:+$*}"
+    ;;
+  debt)
+    run_claude "/autopilot:debt ${*:+$*}"
+    ;;
+  security-scan|security)
+    run_claude "/autopilot:security-scan ${*:+$*}"
+    ;;
+  config)
+    run_claude "/autopilot:config ${*:+$*}"
+    ;;
+  loop|continuous)
+    exec scripts/autopilot-loop.sh "$@"
+    ;;
+  help|-h|--help|"")
+    usage
+    ;;
+  *)
+    usage; exit 1 ;;
+esac

@@ -1,0 +1,133 @@
+# FastAPI + PostgreSQL Template
+# Project Autopilot - Python REST API template
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+
+name: fastapi-postgres
+version: "1.0"
+description: Python REST API with FastAPI, PostgreSQL, and SQLAlchemy
+author: Project Autopilot
+
+techStack:
+  - python
+  - fastapi
+  - postgresql
+  - sqlalchemy
+  - pydantic
+
+variables:
+  - name: project_name
+    description: Project name (used in pyproject.toml and directory)
+    required: true
+
+  - name: description
+    description: Project description
+    default: "A FastAPI REST API with PostgreSQL backend"
+
+  - name: database_name
+    description: PostgreSQL database name
+    default: "{{project_name}}_db"
+
+  - name: python_version
+    description: Python version
+    options:
+      - "3.11"
+      - "3.12"
+    default: "3.12"
+
+  - name: include_celery
+    description: Include Celery for background tasks
+    type: boolean
+    default: false
+
+  - name: include_redis
+    description: Include Redis for caching
+    type: boolean
+    default: false
+
+  - name: auth_method
+    description: Authentication method
+    options:
+      - jwt
+      - oauth2
+      - api_key
+    default: jwt
+
+  - name: author
+    description: Author name
+    default: ""
+
+phases:
+  - id: "001"
+    name: Project Setup
+    description: Initialize Python project with FastAPI, dependencies, and structure
+    cost: 0.15
+    provides: "Project structure, pyproject.toml, virtual environment setup"
+
+  - id: "002"
+    name: Database Configuration
+    description: Configure PostgreSQL with SQLAlchemy and connection pooling
+    cost: 0.35
+    prerequisites: ["001"]
+    provides: "Database connection, session management, base models"
+
+  - id: "003"
+    name: Authentication
+    description: Implement authentication with JWT/OAuth2
+    cost: 0.65
+    prerequisites: ["002"]
+    provides: "Login, registration, token refresh, password reset"
+
+  - id: "004"
+    name: Core Models & Migrations
+    description: Create SQLAlchemy models and Alembic migrations
+    cost: 0.45
+    prerequisites: ["002"]
+    provides: "User model, base entities, migration scripts"
+
+  - id: "005"
+    name: API Endpoints
+    description: Implement CRUD endpoints with Pydantic schemas
+    cost: 0.85
+    prerequisites: ["003", "004"]
+    provides: "REST endpoints, request/response schemas, validation"
+
+  - id: "006"
+    name: Testing Suite
+    description: Configure pytest with fixtures and test coverage
+    cost: 0.55
+    prerequisites: ["005"]
+    provides: "Unit tests, integration tests, test database, fixtures"
+
+  - id: "007"
+    name: Security & Middleware
+    description: Add security middleware, rate limiting, and CORS
+    cost: 0.45
+    prerequisites: ["005"]
+    provides: "Security headers, rate limiting, CORS config, input validation"
+
+  - id: "008"
+    name: Documentation & Deployment
+    description: OpenAPI docs, Docker configuration, deployment guides
+    cost: 0.35
+    prerequisites: ["006", "007"]
+    provides: "Swagger UI, Docker compose, deployment docs"
+
+commands:
+  install: "pip install -e '.[dev]'"
+  dev: "uvicorn app.main:app --reload"
+  build: "docker build -t {{project_name}} ."
+  test: "pytest"
+  lint: "ruff check . && mypy ."
+  migrate: "alembic upgrade head"
+
+totalCost: 3.80
+
+features:
+  - FastAPI with async support
+  - PostgreSQL with SQLAlchemy 2.0
+  - Alembic migrations
+  - Pydantic v2 schemas
+  - JWT Authentication
+  - OpenAPI documentation
+  - Docker support
+  - pytest with coverage
