@@ -1,0 +1,6 @@
+# Autopilot API Orchestrator Dependencies
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+
+anthropic>=0.40.0
+pyyaml>=6.0
+rich>=13.0

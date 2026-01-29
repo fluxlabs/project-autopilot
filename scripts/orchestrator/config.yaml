@@ -1,0 +1,83 @@
+# Autopilot API Orchestrator Configuration
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+
+# Model settings (use short names: haiku, sonnet, opus)
+model: sonnet
+max_tokens: 8192
+
+# Context management
+max_context_tokens: 150000  # 200K limit minus safety buffer
+checkpoint_threshold: 0.6   # Checkpoint at 60% usage
+summary_threshold: 0.8      # Force summary at 80%
+
+# Cost thresholds (USD)
+costs:
+  warn: 10.0
+  alert: 25.0
+  max: 50.0
+
+# Token costs per million (Claude 4.5 pricing)
+# Reference: https://docs.anthropic.com/en/docs/about-claude/pricing
+pricing:
+  haiku:
+    input: 1.0
+    output: 5.0
+  sonnet:
+    input: 3.0
+    output: 15.0
+  opus:
+    input: 5.0
+    output: 25.0
+
+# Tool configuration
+tools:
+  bash:
+    timeout: 120
+    # Commands allowed without confirmation
+    allowed:
+      - git
+      - npm
+      - npx
+      - yarn
+      - pnpm
+      - python
+      - python3
+      - pytest
+      - node
+      - make
+      - cargo
+      - go
+      - ls
+      - cat
+      - head
+      - tail
+      - grep
+      - find
+      - wc
+    # Commands that require confirmation
+    confirm:
+      - rm
+      - mv
+      - chmod
+      - chown
+    # Commands always blocked
+    blocked:
+      - sudo
+      - su
+      - curl
+      - wget
+      - ssh
+
+# Execution settings
+execution:
+  max_iterations: 500        # Safety limit on API calls
+  max_tool_calls_per_turn: 20
+  cooldown_on_error: 5       # Seconds to wait after error
+
+# Git commit strategy
+# Commits happen when phase_complete tool is called (after verification)
+# Not on arbitrary file counts - ensures atomic, meaningful commits
+git:
+  auto_commit_on_phase: true   # Commit when phase is verified complete
+  commit_prefix: "feat"        # Default commit prefix (feat/fix/refactor/etc)
+  require_verification: true   # Only commit if verification is provided

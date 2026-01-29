@@ -1,0 +1,11 @@
+# Autopilot Dashboard Backend
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+websockets>=12.0
+pydantic>=2.5.0
+python-multipart>=0.0.6
+anthropic>=0.40.0
+pyyaml>=6.0
+aiofiles>=23.0.0

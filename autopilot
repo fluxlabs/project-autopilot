@@ -1,0 +1,503 @@
+#!/usr/bin/env bash
+# Project Autopilot - Simplified Launcher
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+#
+# Usage:
+#   ./autopilot init                        Interactive setup wizard
+#   ./autopilot run "Build a REST API"      Start new task
+#   ./autopilot resume                       Resume from checkpoint
+#   ./autopilot status                       Show project status
+#   ./autopilot loop "task"                  Continuous mode
+#   ./autopilot help                         Show this help
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORCHESTRATOR_DIR="$SCRIPT_DIR/scripts/orchestrator"
+PROJECT_DIR="${AUTOPILOT_PROJECT:-$(pwd)}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Load API key from various sources
+load_api_key() {
+    # Already set
+    if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+        return 0
+    fi
+
+    # Check .env in current directory
+    if [[ -f "$PROJECT_DIR/.env" ]]; then
+        export $(grep -E '^ANTHROPIC_API_KEY=' "$PROJECT_DIR/.env" | xargs)
+    fi
+
+    # Check .env in orchestrator directory
+    if [[ -z "$ANTHROPIC_API_KEY" && -f "$ORCHESTRATOR_DIR/.env" ]]; then
+        export $(grep -E '^ANTHROPIC_API_KEY=' "$ORCHESTRATOR_DIR/.env" | xargs)
+    fi
+
+    # Check home directory
+    if [[ -z "$ANTHROPIC_API_KEY" && -f "$HOME/.anthropic_key" ]]; then
+        ANTHROPIC_API_KEY=$(cat "$HOME/.anthropic_key")
+        export ANTHROPIC_API_KEY
+    fi
+
+    # macOS Keychain
+    if [[ -z "$ANTHROPIC_API_KEY" && "$(uname)" == "Darwin" ]]; then
+        ANTHROPIC_API_KEY=$(security find-generic-password -s "anthropic-api-key" -w 2>/dev/null || true)
+        export ANTHROPIC_API_KEY
+    fi
+
+    if [[ -z "$ANTHROPIC_API_KEY" ]]; then
+        echo -e "${RED}Error: ANTHROPIC_API_KEY not found${NC}"
+        echo ""
+        echo -e "${YELLOW}Don't have an API key?${NC}"
+        echo -e "  Get one at: ${BLUE}https://console.anthropic.com/settings/keys${NC}"
+        echo ""
+        echo -e "${YELLOW}Once you have a key, set it via one of:${NC}"
+        echo "  1. export ANTHROPIC_API_KEY=sk-ant-..."
+        echo "  2. echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env"
+        echo "  3. echo 'sk-ant-...' > ~/.anthropic_key"
+        if [[ "$(uname)" == "Darwin" ]]; then
+            echo "  4. security add-generic-password -s 'anthropic-api-key' -a '\$USER' -w 'sk-ant-...'  (Keychain)"
+        fi
+        echo ""
+
+        # Offer to open the link
+        if [[ "$(uname)" == "Darwin" ]]; then
+            read -p "Open Anthropic Console in browser? [y/N] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                open "https://console.anthropic.com/settings/keys"
+                echo ""
+                echo -e "${GREEN}Browser opened!${NC} After creating a key, run this command again."
+            fi
+        fi
+        exit 1
+    fi
+}
+
+# Config file location
+CONFIG_FILE="$HOME/.autopilot.conf"
+
+# Load config if exists
+load_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+    fi
+}
+
+# Interactive init wizard
+run_init() {
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}        Project Autopilot - Setup Wizard${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    # ─────────────────────────────────────────────────────────
+    # Step 1: API Key
+    # ─────────────────────────────────────────────────────────
+    echo -e "${GREEN}Step 1/4: API Key Setup${NC}"
+    echo ""
+
+    # Check if already configured
+    load_api_key_silent
+    if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+        echo -e "  ${GREEN}✓${NC} API key already configured"
+        echo ""
+        read -p "  Reconfigure API key? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            API_KEY_SET=true
+        fi
+    fi
+
+    if [[ -z "$API_KEY_SET" ]]; then
+        echo "  Get your API key at: ${BLUE}https://console.anthropic.com/settings/keys${NC}"
+        echo ""
+
+        if [[ "$(uname)" == "Darwin" ]]; then
+            read -p "  Open Anthropic Console? [Y/n] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                open "https://console.anthropic.com/settings/keys"
+                echo ""
+            fi
+        fi
+
+        echo "  Where should we store your API key?"
+        echo "    1) ~/.anthropic_key (simple file)"
+        echo "    2) macOS Keychain (most secure)"
+        echo "    3) Environment variable (temporary)"
+        echo "    4) Skip (configure later)"
+        echo ""
+        read -p "  Choice [1-4]: " -n 1 -r KEY_CHOICE
+        echo ""
+
+        case $KEY_CHOICE in
+            1)
+                echo ""
+                read -p "  Enter your API key: " API_KEY
+                if [[ -n "$API_KEY" ]]; then
+                    echo "$API_KEY" > "$HOME/.anthropic_key"
+                    chmod 600 "$HOME/.anthropic_key"
+                    echo -e "  ${GREEN}✓${NC} Saved to ~/.anthropic_key"
+                fi
+                ;;
+            2)
+                if [[ "$(uname)" == "Darwin" ]]; then
+                    echo ""
+                    read -p "  Enter your API key: " API_KEY
+                    if [[ -n "$API_KEY" ]]; then
+                        security add-generic-password -U -s "anthropic-api-key" -a "$USER" -w "$API_KEY"
+                        echo -e "  ${GREEN}✓${NC} Saved to macOS Keychain"
+                    fi
+                else
+                    echo -e "  ${YELLOW}Keychain only available on macOS${NC}"
+                fi
+                ;;
+            3)
+                echo ""
+                echo "  Add this to your shell profile (~/.bashrc or ~/.zshrc):"
+                echo "    export ANTHROPIC_API_KEY=sk-ant-..."
+                ;;
+            4)
+                echo -e "  ${YELLOW}Skipped${NC} - configure later with: ./autopilot init"
+                ;;
+        esac
+    fi
+    echo ""
+
+    # ─────────────────────────────────────────────────────────
+    # Step 2: .autopilot folder git tracking
+    # ─────────────────────────────────────────────────────────
+    echo -e "${GREEN}Step 2/4: Git Configuration${NC}"
+    echo ""
+    echo "  The .autopilot folder stores checkpoints, costs, and session data."
+    echo ""
+    echo "  Should .autopilot be committed to git?"
+    echo "    1) Yes - Share progress with team"
+    echo "    2) No  - Add to .gitignore (recommended for solo)"
+    echo "    3) Skip"
+    echo ""
+    read -p "  Choice [1-3]: " -n 1 -r GIT_CHOICE
+    echo ""
+
+    AUTOPILOT_GIT_IGNORE="false"
+    case $GIT_CHOICE in
+        1)
+            AUTOPILOT_GIT_IGNORE="false"
+            echo -e "  ${GREEN}✓${NC} .autopilot will be tracked in git"
+            ;;
+        2)
+            AUTOPILOT_GIT_IGNORE="true"
+            echo -e "  ${GREEN}✓${NC} .autopilot will be added to .gitignore"
+            ;;
+        3)
+            echo -e "  ${YELLOW}Skipped${NC}"
+            ;;
+    esac
+    echo ""
+
+    # ─────────────────────────────────────────────────────────
+    # Step 3: Default model
+    # ─────────────────────────────────────────────────────────
+    echo -e "${GREEN}Step 3/4: Default Model${NC}"
+    echo ""
+    echo "  Which model should be the default?"
+    echo "    1) Sonnet - Balanced speed/quality (recommended)"
+    echo "    2) Haiku  - Fastest, cheapest"
+    echo "    3) Opus   - Highest quality, most expensive"
+    echo ""
+    read -p "  Choice [1-3]: " -n 1 -r MODEL_CHOICE
+    echo ""
+
+    case $MODEL_CHOICE in
+        1) DEFAULT_MODEL="sonnet"; echo -e "  ${GREEN}✓${NC} Default: Sonnet" ;;
+        2) DEFAULT_MODEL="haiku"; echo -e "  ${GREEN}✓${NC} Default: Haiku" ;;
+        3) DEFAULT_MODEL="opus"; echo -e "  ${GREEN}✓${NC} Default: Opus" ;;
+        *) DEFAULT_MODEL="sonnet"; echo -e "  ${GREEN}✓${NC} Default: Sonnet" ;;
+    esac
+    echo ""
+
+    # ─────────────────────────────────────────────────────────
+    # Step 4: Default cost limit
+    # ─────────────────────────────────────────────────────────
+    echo -e "${GREEN}Step 4/4: Cost Limit${NC}"
+    echo ""
+    echo "  Set a default cost limit per session (in USD)."
+    echo "  This prevents runaway costs. Can be overridden with -c flag."
+    echo ""
+    echo "    1) \$5   - Small tasks"
+    echo "    2) \$25  - Medium projects (recommended)"
+    echo "    3) \$50  - Large projects"
+    echo "    4) \$100 - No practical limit"
+    echo "    5) Custom amount"
+    echo ""
+    read -p "  Choice [1-5]: " -n 1 -r COST_CHOICE
+    echo ""
+
+    case $COST_CHOICE in
+        1) DEFAULT_COST="5"; echo -e "  ${GREEN}✓${NC} Limit: \$5" ;;
+        2) DEFAULT_COST="25"; echo -e "  ${GREEN}✓${NC} Limit: \$25" ;;
+        3) DEFAULT_COST="50"; echo -e "  ${GREEN}✓${NC} Limit: \$50" ;;
+        4) DEFAULT_COST="100"; echo -e "  ${GREEN}✓${NC} Limit: \$100" ;;
+        5)
+            echo ""
+            read -p "  Enter amount (e.g., 15): \$" CUSTOM_COST
+            DEFAULT_COST="${CUSTOM_COST:-25}"
+            echo -e "  ${GREEN}✓${NC} Limit: \$${DEFAULT_COST}"
+            ;;
+        *) DEFAULT_COST="25"; echo -e "  ${GREEN}✓${NC} Limit: \$25" ;;
+    esac
+    echo ""
+
+    # ─────────────────────────────────────────────────────────
+    # Save config
+    # ─────────────────────────────────────────────────────────
+    echo -e "${GREEN}Saving configuration...${NC}"
+    cat > "$CONFIG_FILE" << EOF
+# Autopilot Configuration
+# Generated by: ./autopilot init
+# Location: $CONFIG_FILE
+
+# Default model (haiku/sonnet/opus)
+AUTOPILOT_DEFAULT_MODEL="${DEFAULT_MODEL}"
+
+# Default cost limit in USD
+AUTOPILOT_DEFAULT_COST="${DEFAULT_COST}"
+
+# Add .autopilot to .gitignore in new projects
+AUTOPILOT_GIT_IGNORE="${AUTOPILOT_GIT_IGNORE}"
+EOF
+
+    echo -e "  ${GREEN}✓${NC} Saved to $CONFIG_FILE"
+    echo ""
+
+    # ─────────────────────────────────────────────────────────
+    # Summary
+    # ─────────────────────────────────────────────────────────
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}Setup Complete!${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  Configuration saved to: $CONFIG_FILE"
+    echo ""
+    echo "  Quick start:"
+    echo "    ./autopilot run \"Your task here\""
+    echo ""
+    echo "  Run './autopilot help' for all commands."
+    echo ""
+}
+
+# Silent API key loader (for init check)
+load_api_key_silent() {
+    if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+        return 0
+    fi
+    if [[ -f "$PROJECT_DIR/.env" ]]; then
+        export $(grep -E '^ANTHROPIC_API_KEY=' "$PROJECT_DIR/.env" 2>/dev/null | xargs) 2>/dev/null
+    fi
+    if [[ -z "$ANTHROPIC_API_KEY" && -f "$HOME/.anthropic_key" ]]; then
+        ANTHROPIC_API_KEY=$(cat "$HOME/.anthropic_key" 2>/dev/null)
+        export ANTHROPIC_API_KEY
+    fi
+    if [[ -z "$ANTHROPIC_API_KEY" && "$(uname)" == "Darwin" ]]; then
+        ANTHROPIC_API_KEY=$(security find-generic-password -s "anthropic-api-key" -w 2>/dev/null || true)
+        export ANTHROPIC_API_KEY
+    fi
+}
+
+# Check dependencies
+check_deps() {
+    if ! command -v python3 &> /dev/null; then
+        echo -e "${RED}Error: python3 not found${NC}"
+        exit 1
+    fi
+
+    # Check if dependencies are installed
+    if ! python3 -c "import anthropic, yaml" 2>/dev/null; then
+        echo -e "${YELLOW}Installing dependencies...${NC}"
+        pip3 install -q -r "$ORCHESTRATOR_DIR/requirements.txt"
+    fi
+}
+
+# Show help
+show_help() {
+    echo -e "${BLUE}Project Autopilot${NC} - Autonomous coding orchestrator"
+    echo ""
+    echo -e "${GREEN}Usage:${NC}"
+    echo "  autopilot init              Interactive setup wizard"
+    echo "  autopilot run <task>        Start a new task"
+    echo "  autopilot resume            Resume from last checkpoint"
+    echo "  autopilot loop <task>       Run continuously (auto-restart)"
+    echo "  autopilot status            Show current status"
+    echo "  autopilot config            Show current configuration"
+    echo "  autopilot help              Show this help"
+    echo ""
+    echo -e "${GREEN}Options:${NC}"
+    echo "  -p, --project <dir>         Project directory (default: current)"
+    echo "  -m, --model <model>         Model override (haiku/sonnet/opus)"
+    echo "  -c, --cost <amount>         Max cost limit in dollars"
+    echo ""
+    echo -e "${GREEN}Examples:${NC}"
+    echo "  autopilot run \"Add user authentication\""
+    echo "  autopilot run \"Fix bug in login\" -c 5.0"
+    echo "  autopilot loop \"Build REST API\" -m sonnet"
+    echo "  autopilot resume -p ~/my-project"
+    echo ""
+    echo -e "${GREEN}Environment:${NC}"
+    echo "  ANTHROPIC_API_KEY           API key (or use .env file)"
+    echo "  AUTOPILOT_PROJECT           Default project directory"
+}
+
+# Parse global options
+parse_opts() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -p|--project)
+                PROJECT_DIR="$2"
+                shift 2
+                ;;
+            -m|--model)
+                MODEL_ARG="--model $2"
+                shift 2
+                ;;
+            -c|--cost)
+                COST_ARG="--max-cost $2"
+                shift 2
+                ;;
+            *)
+                REMAINING_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
+
+# Run orchestrator
+run_orchestrator() {
+    cd "$ORCHESTRATOR_DIR"
+    python3 main.py --project "$PROJECT_DIR" $MODEL_ARG $COST_ARG "$@"
+}
+
+# Main
+main() {
+    REMAINING_ARGS=()
+    MODEL_ARG=""
+    COST_ARG=""
+
+    # No args - show help
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+
+    COMMAND="$1"
+    shift
+
+    parse_opts "$@"
+    set -- "${REMAINING_ARGS[@]}"
+
+    # Load saved config
+    load_config
+
+    case "$COMMAND" in
+        init|setup)
+            run_init
+            ;;
+
+        config|settings)
+            echo -e "${BLUE}Current Configuration${NC}"
+            echo ""
+            if [[ -f "$CONFIG_FILE" ]]; then
+                echo "  Config file: $CONFIG_FILE"
+                echo ""
+                echo -e "  ${GREEN}Settings:${NC}"
+                echo "    Default model: ${AUTOPILOT_DEFAULT_MODEL:-sonnet}"
+                echo "    Default cost:  \$${AUTOPILOT_DEFAULT_COST:-25}"
+                echo "    Git ignore:    ${AUTOPILOT_GIT_IGNORE:-false}"
+                echo ""
+                echo "  Run './autopilot init' to reconfigure."
+            else
+                echo -e "  ${YELLOW}No configuration found.${NC}"
+                echo "  Run './autopilot init' to set up."
+            fi
+            ;;
+
+        run|start|new)
+            if [[ -z "$1" ]]; then
+                echo -e "${RED}Error: Task description required${NC}"
+                echo "Usage: autopilot run \"Your task description\""
+                exit 1
+            fi
+            load_api_key
+            check_deps
+            # Apply defaults from config if not overridden
+            if [[ -z "$MODEL_ARG" && -n "$AUTOPILOT_DEFAULT_MODEL" ]]; then
+                MODEL_ARG="--model $AUTOPILOT_DEFAULT_MODEL"
+            fi
+            if [[ -z "$COST_ARG" && -n "$AUTOPILOT_DEFAULT_COST" ]]; then
+                COST_ARG="--max-cost $AUTOPILOT_DEFAULT_COST"
+            fi
+            echo -e "${BLUE}Starting task:${NC} $1"
+            echo -e "${BLUE}Project:${NC} $PROJECT_DIR"
+            run_orchestrator --task "$1"
+            ;;
+
+        resume|continue)
+            load_api_key
+            check_deps
+            # Apply defaults from config
+            if [[ -z "$MODEL_ARG" && -n "$AUTOPILOT_DEFAULT_MODEL" ]]; then
+                MODEL_ARG="--model $AUTOPILOT_DEFAULT_MODEL"
+            fi
+            if [[ -z "$COST_ARG" && -n "$AUTOPILOT_DEFAULT_COST" ]]; then
+                COST_ARG="--max-cost $AUTOPILOT_DEFAULT_COST"
+            fi
+            echo -e "${BLUE}Resuming from checkpoint...${NC}"
+            run_orchestrator --resume
+            ;;
+
+        loop|continuous)
+            load_api_key
+            check_deps
+            # Apply defaults from config
+            if [[ -z "$MODEL_ARG" && -n "$AUTOPILOT_DEFAULT_MODEL" ]]; then
+                MODEL_ARG="--model $AUTOPILOT_DEFAULT_MODEL"
+            fi
+            if [[ -z "$COST_ARG" && -n "$AUTOPILOT_DEFAULT_COST" ]]; then
+                COST_ARG="--max-cost $AUTOPILOT_DEFAULT_COST"
+            fi
+            if [[ -z "$1" ]]; then
+                echo -e "${BLUE}Resuming in continuous mode...${NC}"
+                run_orchestrator --resume --continuous
+            else
+                echo -e "${BLUE}Starting continuous mode:${NC} $1"
+                run_orchestrator --task "$1" --continuous
+            fi
+            ;;
+
+        status|info)
+            load_api_key
+            check_deps
+            run_orchestrator --status
+            ;;
+
+        help|--help|-h)
+            show_help
+            ;;
+
+        *)
+            echo -e "${RED}Unknown command: $COMMAND${NC}"
+            echo "Run 'autopilot help' for usage"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

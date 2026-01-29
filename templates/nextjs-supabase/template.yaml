@@ -1,0 +1,139 @@
+# Next.js + Supabase Template
+# Project Autopilot - Full-stack web application template
+# Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
+
+name: nextjs-supabase
+version: "1.0"
+description: Full-stack web application with Next.js 14, Supabase backend, and Tailwind CSS styling
+author: Project Autopilot
+
+techStack:
+  - nextjs
+  - supabase
+  - typescript
+  - tailwind
+  - react
+
+variables:
+  - name: project_name
+    description: Project name (used in package.json and directory)
+    required: true
+
+  - name: description
+    description: Project description
+    default: "A Next.js application with Supabase backend"
+
+  - name: database_name
+    description: Supabase database name
+    default: "{{project_name}}_db"
+
+  - name: auth_provider
+    description: Authentication provider
+    options:
+      - supabase
+      - clerk
+      - auth0
+    default: supabase
+
+  - name: include_storage
+    description: Include Supabase Storage setup
+    type: boolean
+    default: true
+
+  - name: include_realtime
+    description: Include Supabase Realtime setup
+    type: boolean
+    default: false
+
+  - name: author
+    description: Author name for package.json
+    default: ""
+
+phases:
+  - id: "001"
+    name: Project Setup
+    description: Initialize Next.js project with TypeScript, Tailwind, and essential dependencies
+    cost: 0.15
+    provides: "Project structure, TypeScript config, Tailwind setup, ESLint config"
+
+  - id: "002"
+    name: Supabase Configuration
+    description: Configure Supabase client, environment variables, and type generation
+    cost: 0.25
+    prerequisites: ["001"]
+    provides: "Supabase client, typed queries, environment setup"
+
+  - id: "003"
+    name: Authentication System
+    description: Implement authentication with login, signup, password reset, and session management
+    cost: 0.85
+    prerequisites: ["002"]
+    provides: "Auth pages, middleware, protected routes, session handling"
+
+  - id: "004"
+    name: Database Schema
+    description: Design and implement database schema with migrations
+    cost: 0.45
+    prerequisites: ["002"]
+    provides: "Tables, relationships, RLS policies, migrations"
+
+  - id: "005"
+    name: API Routes
+    description: Create API routes for CRUD operations and business logic
+    cost: 0.75
+    prerequisites: ["003", "004"]
+    provides: "REST endpoints, server actions, data validation"
+
+  - id: "006"
+    name: UI Components
+    description: Build reusable UI component library with Tailwind
+    cost: 0.90
+    prerequisites: ["001"]
+    provides: "Button, Input, Card, Modal, Form components"
+
+  - id: "007"
+    name: Page Templates
+    description: Create page layouts and route structure
+    cost: 1.20
+    prerequisites: ["005", "006"]
+    provides: "Dashboard, settings, profile pages, navigation"
+
+  - id: "008"
+    name: Testing Setup
+    description: Configure Jest and Playwright with initial test suites
+    cost: 0.65
+    prerequisites: ["005"]
+    provides: "Unit tests, integration tests, E2E tests"
+
+  - id: "009"
+    name: Security Hardening
+    description: Implement security best practices and validation
+    cost: 0.55
+    prerequisites: ["005", "007"]
+    provides: "Input validation, CORS, rate limiting, security headers"
+
+  - id: "010"
+    name: Documentation & Deployment
+    description: Create documentation and deployment configuration
+    cost: 0.75
+    prerequisites: ["008", "009"]
+    provides: "README, API docs, Vercel config, environment docs"
+
+commands:
+  install: "npm install"
+  dev: "npm run dev"
+  build: "npm run build"
+  test: "npm test"
+  lint: "npm run lint"
+
+totalCost: 6.50
+
+features:
+  - Next.js 14 with App Router
+  - Supabase Authentication
+  - PostgreSQL Database
+  - Row Level Security
+  - Tailwind CSS
+  - TypeScript
+  - Jest + Playwright Testing
+  - ESLint + Prettier

@@ -1,0 +1,28 @@
+{
+  "name": "autopilot",
+  "description": "One command to build entire projects. Auto-scans code, generates validated execution phases, spawns 29 specialized agents in parallel waves, tracks costs vs estimates, and handles interruptions with cross-session persistence — all hands-off with 60-80% token savings.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Jeremy McSpadden",
+    "email": "jeremy@fluxlabs.net"
+  },
+  "homepage": "https://github.com/fluxlabs/project-autopilot",
+  "repository": "https://github.com/fluxlabs/project-autopilot",
+  "keywords": [
+    "project-management",
+    "automation",
+    "token-optimization",
+    "cost-savings",
+    "agents",
+    "swarm",
+    "phase-ordering",
+    "phase-validation",
+    "wave-execution",
+    "quality-gates",
+    "estimates",
+    "actuals",
+    "budget",
+    "cross-session",
+    "ux"
+  ]
+}
